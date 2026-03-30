@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Renovation Budget Tracker — Amanda Katherine Interiors</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: #faf8f4; }
+    input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.4; cursor: pointer; }
+    select option { font-weight: normal; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f5f1eb; }
+    ::-webkit-scrollbar-thumb { background: #c8c2bb; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+
+// ─── BRAND COLORS ─────────────────────────────────────────────────────────────
+const B = {
+  dark:        "#1c1c1a",
+  accent:      "#8a9e8c",
+  accentDark:  "#6b7f6d",
+  accentLight: "#edf1ed",
+  cream:       "#faf8f4",
+  paper:       "#ffffff",
+  border:      "#e4ddd4",
+  borderLight: "#f0ebe4",
+  muted:       "#9e9690",
+  faint:       "#c8c2bb",
+  tan:         "#f5f1eb",
+  paid:        "#5a8a6a",
+  paidLight:   "#edf5f0",
+  warn:        "#c9a96e",
+  warnLight:   "#fdf6ea",
+  danger:      "#c97070",
+  dangerLight: "#fdf0f0",
+};
+
+// ─── ITEM STATUS ──────────────────────────────────────────────────────────────
+const ITEM_STATUSES = ["Not Selected","Sourcing","Selected","On Order","In Progress","Complete"];
+const STATUS_STYLE = {
+  "Not Selected": { bg: B.tan,        color: B.muted      },
+  "Sourcing":     { bg: "#eef1f8",    color: "#4a6fa0"    },
+  "Selected":     { bg: "#f0f4f0",    color: B.accentDark },
+  "On Order":     { bg: B.warnLight,  color: B.warn       },
+  "In Progress":  { bg: "#fef0e0",    color: "#b87a30"    },
+  "Complete":     { bg: B.paidLight,  color: B.paid       },
+};
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2, 9);
+const fmt = (val) =>
+  val == null || val === "" || isNaN(Number(val)) ? "—" : `$${Number(val).toLocaleString()}`;
+
+const inputStyle = {
+  border: `1px solid ${B.border}`, borderRadius: 6, padding: "5px 9px",
+  fontSize: 12, fontFamily: "'Cormorant Garamond', Georgia, serif",
+  color: B.dark, background: B.paper, outline: "none", width: "100%", boxSizing: "border-box",
+};
+
+const Btn = ({ children, onClick, variant = "ghost", small = false, danger = false }) => {
+  const styles = {
+    primary: { background: B.accent,  color: "#fff",    border: "none" },
+    outline: { background: B.paper,   color: B.accent,  border: `1.5px solid ${B.accent}` },
+    ghost:   { background: "transparent", color: B.muted, border: `1px solid ${B.border}` },
+    danger:  { background: "transparent", color: B.danger, border: `1px solid ${B.danger}` },
+  };
+  const s = danger ? styles.danger : (styles[variant] || styles.ghost);
+  return (
+    <button onClick={onClick} style={{
+      ...s, borderRadius: 7, cursor: "pointer", fontFamily: "Georgia, serif",
+      fontSize: small ? 11 : 12, padding: small ? "3px 10px" : "6px 14px",
+      fontWeight: 500, whiteSpace: "nowrap", transition: "opacity 0.1s",
+    }}>{children}</button>
+  );
+};
+
+function SectionLabel({ children }) {
+  return <div style={{ fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: B.faint, marginBottom: 10 }}>{children}</div>;
+}
+
+function Checkbox({ checked, onChange, color = B.accent }) {
+  return (
+    <div onClick={onChange} style={{
+      width: 20, height: 20, borderRadius: 4, flexShrink: 0, cursor: "pointer",
+      border: checked ? `2px solid ${color}` : `2px solid ${B.border}`,
+      background: checked ? color : B.paper,
+      display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s",
+    }}>
+      {checked && <svg width="11" height="8" viewBox="0 0 11 8" fill="none"><path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+    </div>
+  );
+}
+
+function InlineEdit({ value, onChange, placeholder, darkMode = false }) {
+  const [editing, setEditing] = useState(false);
+  const base = darkMode
+    ? { background: "#2e2e2b", color: "#f0ede8", border: "1px dashed #4a4a46" }
+    : { background: B.tan,    color: B.dark,     border: `1px dashed ${B.border}` };
+  if (editing) return (
+    <input autoFocus value={value}
+      onChange={e => onChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+      onKeyDown={e => e.key === "Enter" && setEditing(false)}
+      placeholder={placeholder}
+      style={{ ...inputStyle, ...base, minWidth: 120 }}
+    />
+  );
+  return (
+    <div onClick={() => setEditing(true)} style={{
+      fontSize: 12, padding: "4px 8px", borderRadius: 6, cursor: "text",
+      minHeight: 26, minWidth: 120, display: "flex", alignItems: "center",
+      color: value ? (darkMode ? "#f0ede8" : B.dark) : (darkMode ? "#6a6a66" : B.faint), ...base,
+    }}>
+      {value || <span style={{ fontStyle: "italic" }}>{placeholder}</span>}
+    </div>
+  );
+}
+
+function NumericEdit({ value, onChange, placeholder }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) return (
+    <input autoFocus type="text" value={value ?? ""}
+      onChange={e => onChange(e.target.value === "" ? null : Number(e.target.value))}
+      onBlur={() => setEditing(false)}
+      onKeyDown={e => e.key === "Enter" && setEditing(false)}
+      placeholder={placeholder}
+      style={{ ...inputStyle, width: 80, textAlign: "right" }}
+    />
+  );
+  return (
+    <div onClick={() => setEditing(true)} style={{
+      fontSize: 12, padding: "4px 8px", borderRadius: 6, cursor: "text",
+      minHeight: 26, width: 80, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end",
+      background: B.tan, border: `1px dashed ${B.border}`,
+      color: value != null ? B.dark : B.faint,
+    }}>
+      {value != null ? fmt(value) : <span style={{ fontStyle: "italic", fontSize: 11 }}>{placeholder}</span>}
+    </div>
+  );
+}
+
+// ─── SEED DATA ────────────────────────────────────────────────────────────────
+const seedProjects = () => [
+  {
+    id: uid(), area: "Kitchen", project: "Island Work",
+    description: "Custom cabinet, plumbing, electrical & related work",
+    phases: [
+      { id: uid(), phase: "Custom Island Cabinet (painted)", contractorName: "", trade: "Cabinet Maker",    low: 3500, high: 3500, notes: "Custom built and painted",              status: "Not Selected" },
+      { id: uid(), phase: "Plumbing Disconnect",             contractorName: "", trade: "Plumber",          low: 350,  high: 350,  notes: "Disconnect plumbing at island",          status: "Not Selected" },
+      { id: uid(), phase: "Plumbing Reconnect",              contractorName: "", trade: "Plumber",          low: 700,  high: 800,  notes: "Price depends on new parts needed",      status: "Not Selected" },
+      { id: uid(), phase: "Electrical",                      contractorName: "", trade: "Electrician",      low: 500,  high: 750,  notes: "Hourly rate — estimated range",          status: "Not Selected" },
+      { id: uid(), phase: "Demo",                            contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Tile",                            contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Countertop",                      contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Cabinet Hardware",                contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "New Sink & Faucet",               contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Kitchen Bar Stools",              contractorName: "", trade: "Vendor TBD",       low: null, high: null, notes: "Not yet selected",                       status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Kitchen / Island Work", project: "Move Pendant Lights",
+    description: "Relocate 2 pendant lights + drywall patches",
+    phases: [
+      { id: uid(), phase: "Electrical — Move 2 Pendants", contractorName: "", trade: "Electrician", low: 500, high: 500, notes: "$250 per light x 2", status: "Not Selected" },
+      { id: uid(), phase: "Drywall Patch & Texture (x2)", contractorName: "", trade: "Drywall",     low: 750, high: 750, notes: "$375 per patch x 2", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Kitchen", project: "Beverage / Coffee Bar Station",
+    description: "Custom cabinets, mini fridge, outlets & drywall",
+    phases: [
+      { id: uid(), phase: "Custom Wall Cabinets (painted)",  contractorName: "", trade: "Cabinet Maker",         low: 5000, high: 5000, notes: "Custom built and painted",             status: "Not Selected" },
+      { id: uid(), phase: "Add 2 New Outlets + Drywall",     contractorName: "", trade: "Electrician + Drywall", low: 875,  high: 875,  notes: "Includes drywall repair",              status: "Not Selected" },
+      { id: uid(), phase: "Eliminate Existing Outlet & TV",  contractorName: "", trade: "Electrician",           low: 525,  high: 525,  notes: "Optional removal",                     status: "Not Selected" },
+      { id: uid(), phase: "Mini Fridge",                     contractorName: "", trade: "TBD",                   low: null, high: null, notes: "Not yet selected",                     status: "Not Selected" },
+      { id: uid(), phase: "Demo",                            contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                                     status: "Not Selected" },
+      { id: uid(), phase: "Tile",                            contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                                     status: "Not Selected" },
+      { id: uid(), phase: "Countertop",                      contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                                     status: "Not Selected" },
+      { id: uid(), phase: "Cabinet Hardware",                contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                                     status: "Not Selected" },
+      { id: uid(), phase: "Backsplash / Floating Shelves",   contractorName: "", trade: "TBD",                   low: null, high: null, notes: "Confirm scope",                        status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Living Room", project: "Living Room",
+    description: "Drapery, accessories, art & potential built-in / mantle updates",
+    phases: [
+      { id: uid(), phase: "Drapery Panels",               contractorName: "", trade: "Workroom / Installer", low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Built-In Shelf Accessories",   contractorName: "", trade: "Vendor TBD",           low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Art",                          contractorName: "", trade: "Vendor TBD",           low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Mantle & Built-In Updates",    contractorName: "", trade: "TBD",                  low: null, high: null, notes: "Possible — scope TBD", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Dining Room", project: "Dining Room",
+    description: "New furniture, rug & light fixture",
+    phases: [
+      { id: uid(), phase: "Dining Chairs",       contractorName: "", trade: "Vendor TBD",          low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Dining Table",        contractorName: "", trade: "Vendor TBD",          low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Dining Rug",          contractorName: "", trade: "Vendor TBD",          low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Dining Light Fixture",contractorName: "", trade: "Electrician + Vendor",low: null, high: null, notes: "See Fixtures tab", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Whole Home", project: "Doors & Hardware",
+    description: "New doors and hardware throughout — contractor and install costs TBD",
+    phases: [
+      { id: uid(), phase: "Interior Doors",        contractorName: "", trade: "TBD", low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Door Hardware / Knobs", contractorName: "", trade: "TBD", low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Installation",          contractorName: "", trade: "TBD", low: null, high: null, notes: "Install costs TBD", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Whole House", project: "Interior Paint",
+    description: "Full interior paint — quote already received",
+    phases: [
+      { id: uid(), phase: "Whole House Interior Paint", contractorName: "", trade: "Painter", low: 10000, high: 10000, notes: "Quote in hand", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Powder Bath", project: "Powder Bath Wallpaper",
+    description: "Wallpaper installation — bid pending",
+    phases: [
+      { id: uid(), phase: "Wallpaper Install", contractorName: "", trade: "Wallpaper Installer", low: null, high: null, notes: "Bid pending", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Daughter's Room", project: "Vanity Cabinet",
+    description: "Custom or sourced vanity cabinet",
+    phases: [
+      { id: uid(), phase: "Vanity Cabinet", contractorName: "", trade: "TBD", low: null, high: null, notes: "Quote pending", status: "Not Selected" },
+      { id: uid(), phase: "Installation",   contractorName: "", trade: "TBD", low: null, high: null, notes: "Quote pending", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Front Room", project: "Furniture",
+    description: "Furniture selections TBD",
+    phases: [
+      { id: uid(), phase: "Furniture Pieces (TBD)", contractorName: "", trade: "Vendor TBD", low: null, high: null, notes: "Pieces not yet selected", status: "Not Selected" },
+    ],
+  },
+];
+
+const seedFixtures = () => [
+  { id: uid(), room: "Kitchen",     name: "Island Pendants",        qty: 2, budgetLow: 150, budgetHigh: 600,  status: "Not selected", selectedFixture: "", installCost: "", notes: "2 pendants — electrician will move locations" },
+  { id: uid(), room: "Dining Room", name: "Dining Room Chandelier", qty: 1, budgetLow: 300, budgetHigh: 1200, status: "Not selected", selectedFixture: "", installCost: "", notes: "" },
+  { id: uid(), room: "Living Room", name: "Living Room Light",      qty: 1, budgetLow: 200, budgetHigh: 800,  status: "Not selected", selectedFixture: "", installCost: "", notes: "" },
+];
+
+const FIXTURE_STATUSES = ["Not selected","Shopping","Ordered","Delivered","Installed"];
+const FIXTURE_STATUS_STYLE = {
+  "Not selected": { bg: B.tan,       color: B.muted   },
+  "Shopping":     { bg: "#eef1f8",   color: "#4a6fa0" },
+  "Ordered":      { bg: B.warnLight, color: B.warn    },
+  "Delivered":    { bg: B.paidLight, color: B.paid    },
+  "Installed":    { bg: B.paid,      color: "#fff"    },
+};
+
+// ─── BLANK PHASE TEMPLATE ─────────────────────────────────────────────────────
+const blankPhase = () => ({ id: uid(), phase: "", contractorName: "", trade: "", low: null, high: null, notes: "", status: "Not Selected" });
+const blankProject = () => ({ id: uid(), area: "", project: "", description: "", phases: [blankPhase()] });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUDGET TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+function BudgetTab({ projects, setProjects, priceMode }) {
+  const [checked, setChecked] = useState({});
+  const [expandedProj, setExpandedProj] = useState({});
+  const [addingPhase, setAddingPhase] = useState(null); // projId
+  const [newPhase, setNewPhase] = useState(blankPhase());
+  const [confirmDelete, setConfirmDelete] = useState(null); // { type, projId, phaseId }
+
+  const toggleCheck = (id) => setChecked(p => ({ ...p, [id]: !p[id] }));
+  const toggleProj = (id) => setExpandedProj(p => ({ ...p, [id]: !p[id] }));
+
+  // Project-level updates
+  const updateProj = (projId, field, val) =>
+    setProjects(prev => prev.map(p => p.id !== projId ? p : { ...p, [field]: val }));
+
+  const deleteProject = (projId) => {
+    setProjects(prev => prev.filter(p => p.id !== projId));
+    setConfirmDelete(null);
+  };
+
+  const addProject = () =>
+    setProjects(prev => [...prev, blankProject()]);
+
+  // Phase-level updates
+  const updatePhase = (projId, phaseId, field, val) =>
+    setProjects(prev => prev.map(proj =>
+      proj.id !== projId ? proj : {
+        ...proj, phases: proj.phases.map(ph => ph.id !== phaseId ? ph : { ...ph, [field]: val })
+      }
+    ));
+
+  const deletePhase = (projId, phaseId) => {
+    setProjects(prev => prev.map(proj =>
+      proj.id !== projId ? proj : { ...proj, phases: proj.phases.filter(ph => ph.id !== phaseId) }
+    ));
+    setConfirmDelete(null);
+  };
+
+  const commitNewPhase = (projId) => {
+    if (!newPhase.phase.trim()) return;
+    setProjects(prev => prev.map(proj =>
+      proj.id !== projId ? proj : { ...proj, phases: [...proj.phases, { ...newPhase, id: uid() }] }
+    ));
+    setNewPhase(blankPhase());
+    setAddingPhase(null);
+  };
+
+  const totalSelected = useMemo(() => {
+    let sum = 0;
+    projects.forEach(proj => proj.phases.forEach(ph => {
+      if (checked[ph.id] && ph.low != null) sum += priceMode === "low" ? ph.low : ph.high;
+    }));
+    return sum;
+  }, [checked, priceMode, projects]);
+
+  const totalItems = projects.reduce((a, p) => a + p.phases.length, 0);
+  const pendingCount = projects.reduce((a, p) => a + p.phases.filter(ph => ph.low == null).length, 0);
+
+  return (
+    <div>
+      {/* Summary bar */}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 24, background: B.paper, border: `1.5px solid ${B.border}`, borderRadius: 12, padding: "16px 22px", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: B.muted, marginBottom: 2 }}>Checked Total</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: B.accent }}>${totalSelected.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: B.faint }}>{priceMode} estimate</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: B.muted, marginBottom: 2 }}>Total Line Items</div>
+          <div style={{ fontSize: 26, fontWeight: 700 }}>{totalItems}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: B.muted, marginBottom: 2 }}>Awaiting Quotes</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: B.warn }}>{pendingCount}</div>
+        </div>
+        <div style={{ marginLeft: "auto" }}>
+          <Btn variant="outline" onClick={addProject}>+ Add Project Area</Btn>
+        </div>
+      </div>
+
+      {/* Projects */}
+      {projects.map(proj => {
+        const isExpanded = expandedProj[proj.id] !== false; // default open
+        const projTotal = proj.phases.reduce((a, ph) => ph.low == null ? a : a + (priceMode === "low" ? ph.low : ph.high), 0);
+        const projChecked = proj.phases.reduce((a, ph) => (checked[ph.id] && ph.low != null) ? a + (priceMode === "low" ? ph.low : ph.high) : a, 0);
+
+        return (
+          <div key={proj.id} style={{ marginBottom: 22, border: `1.5px solid ${B.border}`, borderRadius: 12, overflow: "hidden", background: B.paper }}>
+            {/* Project header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: B.tan, borderBottom: isExpanded ? `1px solid ${B.border}` : "none", flexWrap: "wrap" }}>
+              <div onClick={() => toggleProj(proj.id)} style={{ cursor: "pointer", fontSize: 13, color: B.faint, userSelect: "none", flexShrink: 0 }}>
+                {isExpanded ? "▾" : "▸"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <InlineEdit value={proj.area} onChange={v => updateProj(proj.id, "area", v)} placeholder="Area (e.g. Kitchen)" />
+                  <span style={{ color: B.faint, fontSize: 13 }}>/</span>
+                  <InlineEdit value={proj.project} onChange={v => updateProj(proj.id, "project", v)} placeholder="Project name" />
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  <InlineEdit value={proj.description} onChange={v => updateProj(proj.id, "description", v)} placeholder="Description (optional)" />
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                {projTotal > 0 && <div style={{ fontSize: 14, fontWeight: 700, color: B.muted }}>{fmt(projTotal)}</div>}
+                {projChecked > 0 && <div style={{ fontSize: 11, color: B.accent }}>{fmt(projChecked)} checked</div>}
+              </div>
+              <Btn small danger onClick={() => setConfirmDelete({ type: "project", projId: proj.id })}>✕</Btn>
+            </div>
+
+            {/* Phase rows */}
+            {isExpanded && (
+              <>
+                {/* Column headers */}
+                <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 140px 140px 80px 80px 120px 34px", gap: 8, padding: "6px 16px", background: "#faf8f4", borderBottom: `1px solid ${B.borderLight}` }}>
+                  {["", "Line Item", "Trade / Vendor", "Contractor", "Low", "High", "Status", ""].map((h, i) => (
+                    <div key={i} style={{ fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: B.faint, textAlign: i >= 4 && i <= 5 ? "right" : "left" }}>{h}</div>
+                  ))}
+                </div>
+
+                {proj.phases.map(ph => {
+                  const st = STATUS_STYLE[ph.status] || STATUS_STYLE["Not Selected"];
+                  return (
+                    <div key={ph.id} style={{ display: "grid", gridTemplateColumns: "28px 1fr 140px 140px 80px 80px 120px 34px", gap: 8, padding: "9px 16px", borderBottom: `1px solid ${B.borderLight}`, alignItems: "center", background: checked[ph.id] ? B.accentLight : "transparent" }}>
+                      <Checkbox checked={!!checked[ph.id]} onChange={() => toggleCheck(ph.id)} />
+                      <div>
+                        <InlineEdit value={ph.phase} onChange={v => updatePhase(proj.id, ph.id, "phase", v)} placeholder="Line item name" />
+                        {ph.notes && <div style={{ fontSize: 10, color: B.faint, marginTop: 2, paddingLeft: 8 }}>{ph.notes}</div>}
+                      </div>
+                      <InlineEdit value={ph.trade} onChange={v => updatePhase(proj.id, ph.id, "trade", v)} placeholder="Trade / vendor" />
+                      <InlineEdit value={ph.contractorName} onChange={v => updatePhase(proj.id, ph.id, "contractorName", v)} placeholder="Contractor name" />
+                      <NumericEdit value={ph.low} onChange={v => updatePhase(proj.id, ph.id, "low", v)} placeholder="Low" />
+                      <NumericEdit value={ph.high} onChange={v => updatePhase(proj.id, ph.id, "high", v)} placeholder="High" />
+                      <select value={ph.status} onChange={e => updatePhase(proj.id, ph.id, "status", e.target.value)}
+                        style={{ ...inputStyle, background: st.bg, color: st.color, fontWeight: 600, fontSize: 11, padding: "3px 6px", cursor: "pointer" }}>
+                        {ITEM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <Btn small danger onClick={() => setConfirmDelete({ type: "phase", projId: proj.id, phaseId: ph.id })}>✕</Btn>
+                    </div>
+                  );
+                })}
+
+                {/* Add line item row */}
+                {addingPhase === proj.id ? (
+                  <div style={{ padding: "10px 16px", borderTop: `1px solid ${B.borderLight}`, background: B.accentLight }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 140px 80px 80px", gap: 8, marginBottom: 8 }}>
+                      <input autoFocus placeholder="Line item name *" value={newPhase.phase}
+                        onChange={e => setNewPhase(p => ({ ...p, phase: e.target.value }))}
+                        style={inputStyle} />
+                      <input placeholder="Trade / vendor" value={newPhase.trade}
+                        onChange={e => setNewPhase(p => ({ ...p, trade: e.target.value }))}
+                        style={inputStyle} />
+                      <input placeholder="Contractor" value={newPhase.contractorName}
+                        onChange={e => setNewPhase(p => ({ ...p, contractorName: e.target.value }))}
+                        style={inputStyle} />
+                      <input placeholder="Low $" type="text" value={newPhase.low ?? ""}
+                        onChange={e => setNewPhase(p => ({ ...p, low: e.target.value === "" ? null : Number(e.target.value) }))}
+                        style={{ ...inputStyle, textAlign: "right" }} />
+                      <input placeholder="High $" type="text" value={newPhase.high ?? ""}
+                        onChange={e => setNewPhase(p => ({ ...p, high: e.target.value === "" ? null : Number(e.target.value) }))}
+                        style={{ ...inputStyle, textAlign: "right" }} />
+                    </div>
+                    <input placeholder="Notes (optional)" value={newPhase.notes}
+                      onChange={e => setNewPhase(p => ({ ...p, notes: e.target.value }))}
+                      style={{ ...inputStyle, marginBottom: 8 }} />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Btn variant="primary" onClick={() => commitNewPhase(proj.id)}>Add Line Item</Btn>
+                      <Btn onClick={() => { setAddingPhase(null); setNewPhase(blankPhase()); }}>Cancel</Btn>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: "8px 16px", borderTop: `1px solid ${B.borderLight}` }}>
+                    <Btn onClick={() => { setAddingPhase(proj.id); setNewPhase(blankPhase()); }}>+ Add Line Item</Btn>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
+
+      <div style={{ marginTop: 8 }}>
+        <Btn variant="outline" onClick={addProject}>+ Add New Project Area</Btn>
+      </div>
+
+      {/* Confirm delete modal */}
+      {confirmDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: B.paper, borderRadius: 14, padding: "28px 32px", maxWidth: 360, boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 10 }}>
+              {confirmDelete.type === "project" ? "Delete this project?" : "Delete this line item?"}
+            </div>
+            <div style={{ fontSize: 13, color: B.muted, marginBottom: 22 }}>This can't be undone.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn variant="primary" danger onClick={() => confirmDelete.type === "project" ? deleteProject(confirmDelete.projId) : deletePhase(confirmDelete.projId, confirmDelete.phaseId)}>
+                Delete
+              </Btn>
+              <Btn onClick={() => setConfirmDelete(null)}>Cancel</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SELECTIONS TAB — track what's selected, on order, in progress, complete
+// ═══════════════════════════════════════════════════════════════════════════════
+function SelectionsTab({ projects }) {
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterArea, setFilterArea] = useState("All");
+
+  const allItems = useMemo(() => {
+    const items = [];
+    projects.forEach(proj => proj.phases.forEach(ph => {
+      items.push({ ...ph, area: proj.area, project: proj.project });
+    }));
+    return items;
+  }, [projects]);
+
+  const areas = useMemo(() => ["All", ...new Set(projects.map(p => p.area))], [projects]);
+
+  const filtered = useMemo(() => allItems.filter(item => {
+    const statusMatch = filterStatus === "All" || item.status === filterStatus;
+    const areaMatch = filterArea === "All" || item.area === filterArea;
+    return statusMatch && areaMatch;
+  }), [allItems, filterStatus, filterArea, ]);
+
+  const counts = useMemo(() => {
+    const c = {};
+    ITEM_STATUSES.forEach(s => { c[s] = allItems.filter(i => i.status === s).length; });
+    c["All"] = allItems.length;
+    return c;
+  }, [allItems]);
+
+  return (
+    <div>
+      {/* Status summary pills */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        {["All", ...ITEM_STATUSES].map(s => {
+          const st = STATUS_STYLE[s] || { bg: B.tan, color: B.muted };
+          const active = filterStatus === s;
+          return (
+            <button key={s} onClick={() => setFilterStatus(s)} style={{
+              padding: "6px 14px", borderRadius: 20, border: active ? `2px solid ${st.color || B.accent}` : `1.5px solid ${B.border}`,
+              background: active ? (st.bg || B.accentLight) : B.paper,
+              color: active ? (st.color || B.accentDark) : B.muted,
+              fontFamily: "Georgia, serif", fontSize: 12, fontWeight: active ? 700 : 400, cursor: "pointer",
+            }}>
+              {s} <span style={{ fontSize: 11, opacity: 0.7 }}>({counts[s] ?? 0})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Area filter */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: B.faint, letterSpacing: 2, textTransform: "uppercase" }}>Filter by area:</span>
+        <select value={filterArea} onChange={e => setFilterArea(e.target.value)}
+          style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
+          {areas.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <span style={{ fontSize: 12, color: B.faint }}>Showing {filtered.length} item{filtered.length !== 1 ? "s" : ""}</span>
+      </div>
+
+      {/* Items table */}
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: "center", color: B.faint, fontSize: 14, padding: "40px 0", fontStyle: "italic" }}>No items match this filter.</div>
+      ) : (
+        <div style={{ border: `1.5px solid ${B.border}`, borderRadius: 12, overflow: "hidden", background: B.paper }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 140px 80px 80px 120px", gap: 10, padding: "7px 16px", background: B.tan, borderBottom: `1px solid ${B.borderLight}` }}>
+            {["Item", "Area / Project", "Contractor", "Low", "High", "Status"].map((h, i) => (
+              <div key={i} style={{ fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: B.faint, textAlign: i >= 3 && i <= 4 ? "right" : "left" }}>{h}</div>
+            ))}
+          </div>
+          {filtered.map((item, i) => {
+            const st = STATUS_STYLE[item.status] || STATUS_STYLE["Not Selected"];
+            const isLast = i === filtered.length - 1;
+            return (
+              <div key={item.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 140px 80px 80px 120px", gap: 10, padding: "10px 16px", borderBottom: isLast ? "none" : `1px solid ${B.borderLight}`, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{item.phase || <span style={{ color: B.faint, fontStyle: "italic" }}>Unnamed</span>}</div>
+                  {item.notes && <div style={{ fontSize: 10, color: B.faint, marginTop: 1 }}>{item.notes}</div>}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: B.muted }}>{item.area}</div>
+                  <div style={{ fontSize: 11, color: B.faint }}>{item.project}</div>
+                </div>
+                <div style={{ fontSize: 12, color: item.contractorName ? B.dark : B.faint, fontStyle: item.contractorName ? "normal" : "italic" }}>
+                  {item.contractorName || "TBD"}
+                </div>
+                <div style={{ textAlign: "right", fontSize: 12, color: item.low != null ? B.dark : B.faint, fontStyle: item.low != null ? "normal" : "italic" }}>
+                  {item.low != null ? fmt(item.low) : "TBD"}
+                </div>
+                <div style={{ textAlign: "right", fontSize: 12, color: item.high != null ? B.dark : B.faint, fontStyle: item.high != null ? "normal" : "italic" }}>
+                  {item.high != null ? fmt(item.high) : "TBD"}
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, background: st.bg, color: st.color, padding: "3px 9px", borderRadius: 20, fontWeight: 600, letterSpacing: 0.5 }}>
+                    {item.status}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FIXTURES TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+function FixturesTab() {
+  const [fixtures, setFixtures] = useState(seedFixtures);
+  const [showAdd, setShowAdd] = useState(false);
+  const [nf, setNf] = useState({ room: "", name: "", qty: 1, budgetLow: "", budgetHigh: "", notes: "" });
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const upd = (id, field, value) => setFixtures(prev => prev.map(fx => fx.id !== id ? fx : { ...fx, [field]: value }));
+
+  const addFx = () => {
+    if (!nf.name.trim()) return;
+    setFixtures(prev => [...prev, { id: uid(), ...nf, qty: parseInt(nf.qty)||1, budgetLow: nf.budgetLow === "" ? null : Number(nf.budgetLow), budgetHigh: nf.budgetHigh === "" ? null : Number(nf.budgetHigh), status: "Not selected", selectedFixture: "", installCost: "", }]);
+    setNf({ room: "", name: "", qty: 1, budgetLow: "", budgetHigh: "", notes: "" });
+    setShowAdd(false);
+  };
+
+  const totalLow  = fixtures.reduce((a, fx) => fx.budgetLow  != null ? a + fx.budgetLow  * fx.qty : a, 0);
+  const totalHigh = fixtures.reduce((a, fx) => fx.budgetHigh != null ? a + fx.budgetHigh * fx.qty : a, 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 20 }}>
+        {[
+          { label: "Budget Range",      value: `${fmt(totalLow)} – ${fmt(totalHigh)}`, color: B.dark },
+          { label: "Fixtures Tracked",  value: fixtures.length,                        color: B.dark },
+          { label: "Installed",         value: fixtures.filter(f => f.status === "Installed").length, color: B.paid },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ flex: 1, minWidth: 130, background: B.paper, border: `1.5px solid ${B.border}`, borderRadius: 10, padding: "12px 16px" }}>
+            <div style={{ fontSize: 9, letterSpacing: 3, textTransform: "uppercase", color: B.muted, marginBottom: 3 }}>{label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
+          </div>
+        ))}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <Btn variant="outline" onClick={() => setShowAdd(true)}>+ Add Fixture</Btn>
+        </div>
+      </div>
+
+      <div style={{ border: `1.5px solid ${B.border}`, borderRadius: 12, overflow: "hidden", background: B.paper, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 50px 160px 160px 130px 30px", gap: 8, padding: "7px 16px", background: B.tan, borderBottom: `1px solid ${B.borderLight}` }}>
+          {["Fixture / Room", "Qty", "Budget Range (each)", "Selected Fixture", "Status", ""].map((h, i) => (
+            <div key={i} style={{ fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: B.faint }}>{h}</div>
+          ))}
+        </div>
+        {fixtures.map((fx, i) => {
+          const sc = FIXTURE_STATUS_STYLE[fx.status] || FIXTURE_STATUS_STYLE["Not selected"];
+          const isLast = i === fixtures.length - 1;
+          return (
+            <div key={fx.id} style={{ borderBottom: isLast ? "none" : `1px solid ${B.borderLight}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 50px 160px 160px 130px 30px", gap: 8, padding: "10px 16px", alignItems: "center" }}>
+                <div>
+                  <InlineEdit value={fx.name} onChange={v => upd(fx.id, "name", v)} placeholder="Fixture name" />
+                  <InlineEdit value={fx.room} onChange={v => upd(fx.id, "room", v)} placeholder="Room" />
+                </div>
+                <input type="number" min="1" value={fx.qty} onChange={e => upd(fx.id, "qty", parseInt(e.target.value)||1)} style={{ ...inputStyle, width: 44 }} />
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input type="text" value={fx.budgetLow ?? ""} placeholder="Low" onChange={e => upd(fx.id, "budgetLow", e.target.value === "" ? null : Number(e.target.value))} style={{ ...inputStyle, width: 62 }} />
+                  <span style={{ color: B.faint, flexShrink: 0 }}>–</span>
+                  <input type="text" value={fx.budgetHigh ?? ""} placeholder="High" onChange={e => upd(fx.id, "budgetHigh", e.target.value === "" ? null : Number(e.target.value))} style={{ ...inputStyle, width: 62 }} />
+                </div>
+                <InlineEdit value={fx.selectedFixture} onChange={v => upd(fx.id, "selectedFixture", v)} placeholder="Enter fixture name..." />
+                <select value={fx.status} onChange={e => upd(fx.id, "status", e.target.value)}
+                  style={{ ...inputStyle, background: sc.bg, color: sc.color, fontWeight: 600, fontSize: 11, padding: "3px 6px", cursor: "pointer" }}>
+                  {FIXTURE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <Btn small danger onClick={() => setConfirmDel(fx.id)}>✕</Btn>
+              </div>
+              {fx.status !== "Not selected" && (
+                <div style={{ padding: "0 16px 10px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, color: B.faint }}>Install cost:</span>
+                  <input type="text" value={fx.installCost} onChange={e => upd(fx.id, "installCost", e.target.value)} placeholder="Add install cost..." style={{ ...inputStyle, width: 130 }} />
+                  <span style={{ fontSize: 11, color: B.faint }}>Notes:</span>
+                  <input type="text" value={fx.notes} onChange={e => upd(fx.id, "notes", e.target.value)} placeholder="Add note..." style={{ ...inputStyle, flex: 1 }} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {showAdd && (
+        <div style={{ background: B.paper, border: `1.5px solid ${B.accent}`, borderRadius: 12, padding: "16px 18px", marginBottom: 14 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>New Fixture</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 60px 90px 90px", gap: 8, marginBottom: 8 }}>
+            <input placeholder="Fixture name *" value={nf.name} onChange={e => setNf(x => ({...x, name: e.target.value}))} style={inputStyle} />
+            <input placeholder="Room" value={nf.room} onChange={e => setNf(x => ({...x, room: e.target.value}))} style={inputStyle} />
+            <input type="number" min="1" value={nf.qty} placeholder="Qty" onChange={e => setNf(x => ({...x, qty: e.target.value}))} style={inputStyle} />
+            <input placeholder="Low $" value={nf.budgetLow} onChange={e => setNf(x => ({...x, budgetLow: e.target.value}))} style={inputStyle} />
+            <input placeholder="High $" value={nf.budgetHigh} onChange={e => setNf(x => ({...x, budgetHigh: e.target.value}))} style={inputStyle} />
+          </div>
+          <input placeholder="Notes (optional)" value={nf.notes} onChange={e => setNf(x => ({...x, notes: e.target.value}))} style={{ ...inputStyle, marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="primary" onClick={addFx}>Add Fixture</Btn>
+            <Btn onClick={() => setShowAdd(false)}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+
+      {confirmDel && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: B.paper, borderRadius: 14, padding: "28px 32px", maxWidth: 340 }}>
+            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8 }}>Remove this fixture?</div>
+            <div style={{ fontSize: 13, color: B.muted, marginBottom: 20 }}>This can't be undone.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn variant="primary" danger onClick={() => { setFixtures(prev => prev.filter(f => f.id !== confirmDel)); setConfirmDel(null); }}>Remove</Btn>
+              <Btn onClick={() => setConfirmDel(null)}>Cancel</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALENDAR TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY_NAMES = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+const seedEvents = () => [
+  { id: uid(), title: "Island Work",           area: "Kitchen",             color: B.accent,  startDate: "", endDate: "" },
+  { id: uid(), title: "Move Pendant Lights",   area: "Kitchen",             color: "#a89b8c", startDate: "", endDate: "" },
+  { id: uid(), title: "Beverage Station",      area: "Kitchen",             color: "#8a7e9e", startDate: "", endDate: "" },
+  { id: uid(), title: "Living Room",           area: "Living Room",         color: "#9eb8b4", startDate: "", endDate: "" },
+  { id: uid(), title: "Dining Room",           area: "Dining Room",         color: "#b8a48c", startDate: "", endDate: "" },
+  { id: uid(), title: "Doors & Hardware",      area: "Whole Home",          color: "#9a9eb8", startDate: "", endDate: "" },
+  { id: uid(), title: "Interior Paint",        area: "Whole House",         color: "#9eb8a0", startDate: "", endDate: "" },
+  { id: uid(), title: "Powder Bath Wallpaper", area: "Powder Bath",         color: "#b8a08a", startDate: "", endDate: "" },
+  { id: uid(), title: "Vanity Cabinet",        area: "Daughter's Room",     color: "#a08ab8", startDate: "", endDate: "" },
+  { id: uid(), title: "Front Room Furniture",  area: "Front Room",          color: "#8aab9e", startDate: "", endDate: "" },
+];
+
+const seedPayments = () => [
+  { id: uid(), project: "Island Work",           label: "Deposit",          amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Island Work",           label: "Mid-project draw", amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Island Work",           label: "Final payment",    amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Beverage Station",      label: "Deposit",          amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Beverage Station",      label: "Final payment",    amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Dining Room",           label: "Payment due",      amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Doors & Hardware",      label: "Deposit",          amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Doors & Hardware",      label: "Final payment",    amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Interior Paint",        label: "Deposit",          amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Interior Paint",        label: "Final payment",    amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Powder Bath Wallpaper", label: "Payment due",      amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Vanity Cabinet",        label: "Deposit",          amount: "", dueDate: "", paid: false },
+  { id: uid(), project: "Vanity Cabinet",        label: "Final payment",    amount: "", dueDate: "", paid: false },
+];
+
+function CalendarTab() {
+  const today = new Date();
+  const [events, setEvents] = useState(seedEvents);
+  const [payments, setPayments] = useState(seedPayments);
+  const [viewYear, setViewYear]   = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [panel, setPanel]         = useState("calendar");
+  const [selEv, setSelEv]         = useState(null);
+  const [showAddEv, setShowAddEv] = useState(false);
+  const [showAddPay, setShowAddPay] = useState(false);
+  const [newEv, setNewEv]   = useState({ title: "", area: "", color: B.accent, startDate: "", endDate: "" });
+  const [newPay, setNewPay] = useState({ project: "", label: "", amount: "", dueDate: "" });
+
+  const updEv  = (id, f, v) => setEvents(prev => prev.map(e => e.id !== id ? e : { ...e, [f]: v }));
+  const updPay = (id, f, v) => setPayments(prev => prev.map(p => p.id !== id ? p : { ...p, [f]: v }));
+
+  const daysInMonth   = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+  const calDays = [...Array(firstDayOfWeek).fill(null), ...Array.from({length: daysInMonth}, (_, i) => i + 1)];
+
+  const dayStr = (day) => day ? `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}` : "";
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+  const eventsForDay  = (day) => events.filter(ev => { const d = dayStr(day); return d && ev.startDate && ev.endDate && d >= ev.startDate && d <= ev.endDate; });
+  const paymentsForDay = (day) => payments.filter(p => dayStr(day) && p.dueDate === dayStr(day));
+
+  const totalPaid = useMemo(() => payments.reduce((a,p) => { const n=parseFloat(p.amount); return !isNaN(n)&&p.paid?a+n:a; },0),[payments]);
+  const totalDue  = useMemo(() => payments.reduce((a,p) => { const n=parseFloat(p.amount); return !isNaN(n)&&!p.paid?a+n:a; },0),[payments]);
+
+  const prevMonth = () => viewMonth === 0 ? (setViewMonth(11), setViewYear(y=>y-1)) : setViewMonth(m=>m-1);
+  const nextMonth = () => viewMonth === 11 ? (setViewMonth(0),  setViewYear(y=>y+1)) : setViewMonth(m=>m+1);
+
+  const EVENT_COLORS = ["#8a9e8c","#a89b8c","#8a7e9e","#9eb8b4","#b8a48c","#9a9eb8","#9eb8a0","#b8a08a","#a08ab8","#8aab9e"];
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {[["calendar","Calendar"],["payments","Payments"]].map(([id,label]) => (
+          <button key={id} onClick={() => setPanel(id)} style={{
+            padding: "7px 18px", border: `1.5px solid ${panel===id ? B.accent : B.border}`,
+            borderRadius: 8, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12,
+            background: panel===id ? B.accentLight : B.paper,
+            color: panel===id ? B.accentDark : B.muted, fontWeight: panel===id ? 600 : 400,
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {panel === "calendar" && (
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
+          {/* Calendar grid */}
+          <div style={{ flex: 1, minWidth: 320 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <button onClick={prevMonth} style={{ background: "none", border: `1px solid ${B.border}`, borderRadius: 6, width: 30, height: 30, cursor: "pointer", fontSize: 15, color: B.muted }}>‹</button>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{MONTH_NAMES[viewMonth]} {viewYear}</div>
+              <button onClick={nextMonth} style={{ background: "none", border: `1px solid ${B.border}`, borderRadius: 6, width: 30, height: 30, cursor: "pointer", fontSize: 15, color: B.muted }}>›</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, marginBottom: 3 }}>
+              {DAY_NAMES.map(d => <div key={d} style={{ textAlign: "center", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: B.faint, padding: "3px 0" }}>{d}</div>)}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2 }}>
+              {calDays.map((day, idx) => {
+                const dEvs = eventsForDay(day);
+                const dPays = paymentsForDay(day);
+                const isToday = dayStr(day) === todayStr;
+                return (
+                  <div key={idx} style={{ minHeight: 70, borderRadius: 7, padding: "5px 4px", background: !day ? "transparent" : isToday ? B.accentLight : B.paper, border: !day ? "none" : isToday ? `1.5px solid ${B.accent}` : `1px solid ${B.borderLight}` }}>
+                    {day && (
+                      <>
+                        <div style={{ fontSize: 11, fontWeight: isToday ? 700 : 400, color: isToday ? B.accentDark : B.muted, textAlign: "right", marginBottom: 2 }}>{day}</div>
+                        {dEvs.slice(0,2).map(ev => (
+                          <div key={ev.id} onClick={() => setSelEv(ev.id === selEv ? null : ev.id)}
+                            style={{ fontSize: 8, background: ev.color, color: "#fff", borderRadius: 3, padding: "1px 4px", marginBottom: 1, cursor: "pointer", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                            {ev.title}
+                          </div>
+                        ))}
+                        {dEvs.length > 2 && <div style={{ fontSize: 8, color: B.faint }}>+{dEvs.length-2}</div>}
+                        {dPays.map(p => (
+                          <div key={p.id} style={{ fontSize: 8, background: p.paid ? B.paid : B.warn, color: "#fff", borderRadius: 3, padding: "1px 4px", marginBottom: 1 }}>
+                            💰 {p.paid ? "Paid" : (p.amount ? fmt(parseFloat(p.amount)) : "Due")}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Legend */}
+            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {events.filter(ev => ev.startDate).map(ev => (
+                <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: B.muted }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: ev.color, flexShrink: 0 }} />{ev.title}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Project schedule editor */}
+          <div style={{ width: 250, flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <SectionLabel>Project Schedules</SectionLabel>
+              <Btn small onClick={() => setShowAddEv(true)}>+ Add</Btn>
+            </div>
+            {showAddEv && (
+              <div style={{ background: B.paper, border: `1.5px solid ${B.accent}`, borderRadius: 10, padding: "12px", marginBottom: 10 }}>
+                <input placeholder="Project title *" value={newEv.title} onChange={e => setNewEv(x=>({...x,title:e.target.value}))} style={{ ...inputStyle, marginBottom: 6 }} />
+                <input placeholder="Area" value={newEv.area} onChange={e => setNewEv(x=>({...x,area:e.target.value}))} style={{ ...inputStyle, marginBottom: 6 }} />
+                <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                  {EVENT_COLORS.map(c => (
+                    <div key={c} onClick={() => setNewEv(x=>({...x,color:c}))} style={{ width: 18, height: 18, borderRadius: 4, background: c, cursor: "pointer", border: newEv.color===c ? "2px solid #333" : "2px solid transparent" }} />
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn small variant="primary" onClick={() => { if(newEv.title.trim()) { setEvents(prev=>[...prev,{id:uid(),...newEv}]); setNewEv({title:"",area:"",color:B.accent,startDate:"",endDate:""}); setShowAddEv(false); }}}>Add</Btn>
+                  <Btn small onClick={() => setShowAddEv(false)}>Cancel</Btn>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {events.map(ev => (
+                <div key={ev.id} style={{ background: B.paper, border: `1.5px solid ${selEv===ev.id ? ev.color : B.border}`, borderRadius: 9, padding: "10px 12px", cursor: "pointer", transition: "border-color 0.12s" }}
+                  onClick={() => setSelEv(ev.id === selEv ? null : ev.id)}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{ width: 9, height: 9, borderRadius: 2, background: ev.color, flexShrink: 0 }} />
+                    <div style={{ fontWeight: 600, fontSize: 12, flex: 1 }}>{ev.title}</div>
+                    <Btn small danger onClick={e => { e.stopPropagation(); setEvents(prev=>prev.filter(x=>x.id!==ev.id)); }}>✕</Btn>
+                  </div>
+                  {selEv === ev.id && (
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
+                      {[["startDate","Start"],["endDate","End"]].map(([field,label]) => (
+                        <div key={field}>
+                          <div style={{ fontSize: 9, color: B.faint, marginBottom: 2, letterSpacing: 1, textTransform: "uppercase" }}>{label}</div>
+                          <input type="date" value={ev[field]} onChange={e => updEv(ev.id, field, e.target.value)} style={inputStyle} />
+                        </div>
+                      ))}
+                      {ev.startDate && ev.endDate && (
+                        <div style={{ fontSize: 10, color: B.muted }}>
+                          {Math.max(0,Math.round((new Date(ev.endDate)-new Date(ev.startDate))/(1000*60*60*24)))} days
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selEv !== ev.id && (ev.startDate || ev.endDate) && (
+                    <div style={{ fontSize: 10, color: B.faint, marginTop: 3 }}>
+                      {ev.startDate || "?"} {ev.endDate ? `→ ${ev.endDate}` : ""}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {panel === "payments" && (
+        <div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 22 }}>
+            {[
+              { label: "Total Paid", value: fmt(totalPaid), color: B.paid },
+              { label: "Still Due",  value: fmt(totalDue),  color: B.warn },
+              { label: "Tracked",    value: fmt(totalPaid+totalDue), color: B.dark },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ flex: 1, minWidth: 120, background: B.paper, border: `1.5px solid ${B.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ fontSize: 9, letterSpacing: 3, textTransform: "uppercase", color: B.muted, marginBottom: 3 }}>{label}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <Btn variant="outline" onClick={() => setShowAddPay(true)}>+ Add Payment</Btn>
+            </div>
+          </div>
+
+          {showAddPay && (
+            <div style={{ background: B.paper, border: `1.5px solid ${B.accent}`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 110px 140px", gap: 8, marginBottom: 8 }}>
+                <input placeholder="Project *" value={newPay.project} onChange={e => setNewPay(x=>({...x,project:e.target.value}))} style={inputStyle} />
+                <input placeholder="Label (e.g. Deposit)" value={newPay.label} onChange={e => setNewPay(x=>({...x,label:e.target.value}))} style={inputStyle} />
+                <input placeholder="Amount $" value={newPay.amount} onChange={e => setNewPay(x=>({...x,amount:e.target.value}))} style={inputStyle} />
+                <input type="date" value={newPay.dueDate} onChange={e => setNewPay(x=>({...x,dueDate:e.target.value}))} style={inputStyle} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn variant="primary" small onClick={() => { if(newPay.project.trim()) { setPayments(prev=>[...prev,{id:uid(),...newPay,paid:false}]); setNewPay({project:"",label:"",amount:"",dueDate:""}); setShowAddPay(false); }}}>Add</Btn>
+                <Btn small onClick={() => setShowAddPay(false)}>Cancel</Btn>
+              </div>
+            </div>
+          )}
+
+          <div style={{ border: `1.5px solid ${B.border}`, borderRadius: 12, overflow: "hidden", background: B.paper }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 110px 140px 60px 30px", gap: 8, padding: "7px 16px", background: B.tan, borderBottom: `1px solid ${B.borderLight}` }}>
+              {["Project","Payment","Amount","Due Date","Paid",""].map(h => (
+                <div key={h} style={{ fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: B.faint }}>{h}</div>
+              ))}
+            </div>
+            {payments.map((pay, i) => (
+              <div key={pay.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 110px 140px 60px 30px", gap: 8, padding: "9px 16px", borderBottom: i < payments.length-1 ? `1px solid ${B.borderLight}` : "none", alignItems: "center", background: pay.paid ? B.paidLight : "transparent" }}>
+                <div style={{ fontSize: 12, color: B.muted }}>{pay.project}</div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{pay.label}</div>
+                <input type="text" value={pay.amount} onChange={e => updPay(pay.id,"amount",e.target.value)} placeholder="$0" style={inputStyle} />
+                <input type="date" value={pay.dueDate} onChange={e => updPay(pay.id,"dueDate",e.target.value)} style={inputStyle} />
+                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  <Checkbox checked={pay.paid} onChange={() => updPay(pay.id,"paid",!pay.paid)} color={B.paid} />
+                  {pay.paid && <span style={{ fontSize: 10, color: B.paid, fontWeight: 700 }}>✓</span>}
+                </div>
+                <Btn small danger onClick={() => setPayments(prev=>prev.filter(p=>p.id!==pay.id))}>✕</Btn>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
+const TABS = [
+  { id: "budget",     label: "Budget & Quotes" },
+  { id: "selections", label: "Selections Status" },
+  { id: "fixtures",   label: "Light Fixtures"   },
+  { id: "timeline",   label: "Timeline & Payments" },
+];
+
+function App() {
+  const [tab, setTab]           = useState("budget");
+  const [priceMode, setPriceMode] = useState("high");
+  const [projects, setProjects]   = useState(seedProjects);
+
+  return (
+    <div style={{ fontFamily: "'Cormorant Garamond', Georgia, 'Times New Roman', serif", minHeight: "100vh", background: B.cream, color: B.dark }}>
+      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header */}
+      <div style={{ background: B.dark, color: "#f0ede8", padding: "20px 28px 0", borderBottom: `3px solid ${B.accent}`, position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 5, textTransform: "uppercase", color: B.accent, marginBottom: 3 }}>Amanda Katherine Interiors</div>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 400, letterSpacing: "0.5px", color: "#f0ede8" }}>Renovation Budget Tracker</h1>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#2e2e2b", borderRadius: 8, padding: "4px 6px" }}>
+              <span style={{ fontSize: 9, color: "#6a6a66", letterSpacing: 1 }}>ESTIMATE</span>
+              {["low","high"].map(m => (
+                <button key={m} onClick={() => setPriceMode(m)} style={{
+                  padding: "3px 12px", borderRadius: 5, border: "none", cursor: "pointer",
+                  fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1,
+                  background: priceMode===m ? B.accent : "transparent",
+                  color: priceMode===m ? "#fff" : "#6a6a66", transition: "all 0.12s",
+                }}>{m}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 1 }}>
+            {TABS.map(({ id, label }) => (
+              <button key={id} onClick={() => setTab(id)} style={{
+                padding: "8px 18px", border: "none", cursor: "pointer", fontSize: 12,
+                fontFamily: "'Cormorant Garamond', Georgia, serif", letterSpacing: 0.3,
+                background: tab===id ? B.cream : "transparent",
+                color: tab===id ? B.dark : "#8a8a86",
+                borderRadius: "7px 7px 0 0",
+                fontWeight: tab===id ? 600 : 400, transition: "all 0.12s",
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 60px" }}>
+        {tab === "budget"     && <BudgetTab     projects={projects} setProjects={setProjects} priceMode={priceMode} />}
+        {tab === "selections" && <SelectionsTab projects={projects} />}
+        {tab === "fixtures"   && <FixturesTab   />}
+        {tab === "timeline"   && <CalendarTab   />}
+      </div>
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
