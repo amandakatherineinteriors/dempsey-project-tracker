@@ -21,7 +21,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useMemo } = React;
+    const { useState, useMemo, useEffect } = React;
 
 
 // ─── BRAND COLORS ─────────────────────────────────────────────────────────────
@@ -153,17 +153,17 @@ function NumericEdit({ value, onChange, placeholder }) {
 const seedProjects = () => [
   {
     id: uid(), area: "Kitchen", project: "Island Work",
-    description: "Custom cabinet, plumbing, electrical & related work - these numbers are ballpark quotes only",
+    description: "Custom island, plumbing, electrical & related work — these numbers are ballpark quotes",
     phases: [
       { id: uid(), phase: "Custom Island Cabinet (painted)", contractorName: "", trade: "Cabinet Maker",    low: 3500, high: 3500, notes: "Custom built and painted",              status: "Not Selected" },
       { id: uid(), phase: "Plumbing Disconnect",             contractorName: "", trade: "Plumber",          low: 350,  high: 350,  notes: "Disconnect plumbing at island",          status: "Not Selected" },
       { id: uid(), phase: "Plumbing Reconnect",              contractorName: "", trade: "Plumber",          low: 700,  high: 800,  notes: "Price depends on new parts needed",      status: "Not Selected" },
       { id: uid(), phase: "Electrical",                      contractorName: "", trade: "Electrician",      low: 500,  high: 750,  notes: "Hourly rate — estimated range",          status: "Not Selected" },
-      { id: uid(), phase: "Demo existing island",                            contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
-      { id: uid(), phase: "Tile backsplash perimeter",                            contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
-      { id: uid(), phase: "Countertop - island and perimeter",                      contractorName: "", trade: "TBD",              low: 6500, high: 15000, notes: "",                                       status: "Not Selected" },
-      { id: uid(), phase: "Cabinet Hardware",                contractorName: "", trade: "TBD",              low: 400, high: 1000, notes: "",                                       status: "Not Selected" },
-      { id: uid(), phase: "New Sink & Faucet",               contractorName: "", trade: "TBD",              low: 1000, high: 3000, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Demo existing island",             contractorName: "", trade: "TBD",              low: 300,  high: 700,  notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Tile backsplash perimeter",        contractorName: "", trade: "TBD",              low: null, high: null, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Countertop (island and perimeter)",contractorName: "", trade: "TBD",              low: 6500, high: 15000,notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "Cabinet Hardware",                 contractorName: "", trade: "TBD",              low: 400,  high: 1000, notes: "",                                       status: "Not Selected" },
+      { id: uid(), phase: "New Sink & Faucet",                contractorName: "", trade: "TBD",              low: 1000, high: 3000, notes: "",                                       status: "Not Selected" },
       { id: uid(), phase: "Kitchen Bar Stools",              contractorName: "", trade: "Vendor TBD",       low: null, high: null, notes: "Not yet selected",                       status: "Not Selected" },
     ],
   },
@@ -171,8 +171,9 @@ const seedProjects = () => [
     id: uid(), area: "Kitchen / Island Work", project: "Move Pendant Lights",
     description: "Relocate 2 pendant lights + drywall patches",
     phases: [
-      { id: uid(), phase: "Electrical — Move 2 Pendants", contractorName: "", trade: "Electrician", low: 500, high: 500, notes: "$250 per light x 2", status: "Not Selected" },
-      { id: uid(), phase: "Drywall Patch & Texture (x2)", contractorName: "", trade: "Drywall",     low: 750, high: 750, notes: "$375 per patch x 2", status: "Not Selected" },
+      { id: uid(), phase: "Electrical — Move 2 Pendants",      contractorName: "", trade: "Electrician", low: 500, high: 700,  notes: "$250 per light x 2", status: "Not Selected" },
+      { id: uid(), phase: "Drywall Patch & Texture (x2)",       contractorName: "", trade: "Drywall",     low: 750, high: 750,  notes: "$375 per patch x 2", status: "Not Selected" },
+      { id: uid(), phase: "Island pendant light fixtures (x2)", contractorName: "", trade: "",            low: 800, high: 1500, notes: "",                   status: "Not Selected" },
     ],
   },
   {
@@ -180,34 +181,31 @@ const seedProjects = () => [
     description: "Custom cabinets, mini fridge, outlets & drywall",
     phases: [
       { id: uid(), phase: "Custom Wall Cabinets (painted)",  contractorName: "", trade: "Cabinet Maker",         low: 5000, high: 5000, notes: "Custom built and painted",             status: "Not Selected" },
-      { id: uid(), phase: "Add 2 New Outlets + Drywall",     contractorName: "", trade: "Electrician + Drywall", low: 875,  high: 875,  notes: "Includes drywall repair",              status: "Not Selected" },
-
-      { id: uid(), phase: "Mini Fridge",                     contractorName: "", trade: "TBD",                   low: null, high: null, notes: "Not yet selected",                     status: "Not Selected" },
-      { id: uid(), phase: "Wood shiplap accent wall behind floating shelves",                            contractorName: "", trade: "TBD",                   low: 300, high: 600, notes: "",                                     status: "Not Selected" },
-      { id: uid(), phase: "Tile",                            contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                                     status: "Not Selected" },
-      { id: uid(), phase: "Countertop",                      contractorName: "", trade: "TBD",                   low: 500, high: 2000, notes: "",                                     status: "Not Selected" },
-      { id: uid(), phase: "Cabinet Hardware",                contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                                     status: "Not Selected" },
-      { id: uid(), phase: "Backsplash / Floating Shelves",   contractorName: "", trade: "TBD",                   low: null, high: null, notes: "Confirm scope",                        status: "Not Selected" },
+      { id: uid(), phase: "Add 2 New Outlets + Drywall",                   contractorName: "", trade: "Electrician + Drywall", low: 875,  high: 875,  notes: "Includes drywall repair", status: "Not Selected" },
+      { id: uid(), phase: "Mini Fridge",                                   contractorName: "", trade: "TBD",                   low: null, high: null, notes: "Not yet selected",        status: "Not Selected" },
+      { id: uid(), phase: "Wood shiplap accent wall behind floating shelves", contractorName: "", trade: "TBD",                low: 300,  high: 600,  notes: "",                        status: "Not Selected" },
+      { id: uid(), phase: "Countertop",                                    contractorName: "", trade: "TBD",                   low: 500,  high: 2000, notes: "",                        status: "Not Selected" },
+      { id: uid(), phase: "Cabinet Hardware",                              contractorName: "", trade: "TBD",                   low: null, high: null, notes: "",                        status: "Not Selected" },
     ],
   },
   {
     id: uid(), area: "Living Room", project: "Living Room",
     description: "Drapery, accessories, art & potential built-in / mantle updates",
     phases: [
-      { id: uid(), phase: "Drapery Panels",               contractorName: "", trade: "Workroom / Installer", low: 3000, high: 6000, notes: "Not yet selected", status: "Not Selected" },
-      { id: uid(), phase: "Built-In Shelf Accessories",   contractorName: "", trade: "Vendor TBD",           low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
-      { id: uid(), phase: "Art",                          contractorName: "", trade: "Vendor TBD",           low: null, high: null, notes: "Not yet selected", status: "Not Selected" },
-      { id: uid(), phase: "Mantle & Built-In Paint",    contractorName: "", trade: "TBD",                  low: null, high: null, notes: "Possible — scope TBD", status: "Not Selected" },
+      { id: uid(), phase: "Drapery Panels",               contractorName: "", trade: "Workroom / Installer", low: 3000, high: 6000, notes: "Not yet selected",   status: "Not Selected" },
+      { id: uid(), phase: "Built-In Shelf Accessories",   contractorName: "", trade: "Vendor TBD",           low: 600,  high: 1500, notes: "Not yet selected",   status: "Not Selected" },
+      { id: uid(), phase: "Art",                          contractorName: "", trade: "Vendor TBD",           low: 500,  high: 2000, notes: "Not yet selected",   status: "Not Selected" },
+      { id: uid(), phase: "Rebuild Mantle & Built-Ins",   contractorName: "", trade: "TBD",                  low: 5000, high: 8000, notes: "Possible — scope TBD", status: "Not Selected" },
     ],
   },
   {
     id: uid(), area: "Dining Room", project: "Dining Room",
     description: "New furniture, rug & light fixture",
     phases: [
-      { id: uid(), phase: "Dining Chairs",       contractorName: "", trade: "Vendor TBD",          low: 1500, high: 3000, notes: "Not yet selected", status: "Not Selected" },
-      { id: uid(), phase: "Dining Table",        contractorName: "", trade: "Vendor TBD",          low: 1500, high: 3000, notes: "Not yet selected", status: "Not Selected" },
-      { id: uid(), phase: "Dining Rug",          contractorName: "", trade: "Vendor TBD",          low: 950, high: 2000, notes: "Not yet selected", status: "Not Selected" },
-      { id: uid(), phase: "Dining Light Fixture",contractorName: "", trade: "Electrician + Vendor",low: 1800, high: 2500, notes: "See Fixtures tab", status: "Not Selected" },
+      { id: uid(), phase: "Dining Chairs",        contractorName: "", trade: "Vendor TBD",          low: 1500, high: 2500, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Dining Table",         contractorName: "", trade: "Vendor TBD",          low: 1500, high: 2500, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Dining Rug",           contractorName: "", trade: "Vendor TBD",          low: 950,  high: 2000, notes: "Not yet selected", status: "Not Selected" },
+      { id: uid(), phase: "Dining Light Fixture", contractorName: "", trade: "Electrician + Vendor",low: 1700, high: 2100, notes: "See Fixtures tab", status: "Not Selected" },
     ],
   },
   {
@@ -226,14 +224,6 @@ const seedProjects = () => [
       { id: uid(), phase: "Whole House Interior Paint", contractorName: "", trade: "Painter", low: 10000, high: 10000, notes: "Quote in hand", status: "Not Selected" },
     ],
   },
-   {
-    id: uid(), area: "Powder Bath", project: "Powder Bath Wallpaper",
-    description: "Refinish Wood Floors",
-    phases: [
-      { id: uid(), phase: "Patch flooring around island if necessary & refinish", contractorName: "", trade: "Wallpaper Installer", low: 5,000, high: 10,000, notes: "Bid pending", status: "Not Selected" },
-    ],
-  },
-  {
   {
     id: uid(), area: "Powder Bath", project: "Powder Bath Wallpaper",
     description: "Wallpaper installation — bid pending",
@@ -245,15 +235,22 @@ const seedProjects = () => [
     id: uid(), area: "Daughter's Room", project: "Vanity Cabinet",
     description: "Custom or sourced vanity cabinet",
     phases: [
-      { id: uid(), phase: "Vanity Cabinet", contractorName: "", trade: "TBD", low: null, high: null, notes: "Quote pending", status: "Not Selected" },
-      { id: uid(), phase: "Installation",   contractorName: "", trade: "TBD", low: null, high: null, notes: "Quote pending", status: "Not Selected" },
+      { id: uid(), phase: "Vanity Cabinet",            contractorName: "", trade: "TBD", low: null, high: null, notes: "Quote pending", status: "Not Selected" },
+      { id: uid(), phase: "Installation, plumbing hookup", contractorName: "", trade: "TBD", low: null, high: null, notes: "Quote pending", status: "Not Selected" },
     ],
   },
   {
     id: uid(), area: "Front Room", project: "Furniture",
-    description: "Furniture selections TBD",
+    description: "Furniture selections",
     phases: [
       { id: uid(), phase: "Furniture Pieces (TBD)", contractorName: "", trade: "Vendor TBD", low: null, high: null, notes: "Pieces not yet selected", status: "Not Selected" },
+    ],
+  },
+  {
+    id: uid(), area: "Kitchen", project: "Refinish Floors",
+    description: "Wood floor patch and refinish",
+    phases: [
+      { id: uid(), phase: "Patch wood floor around island if necessary and refinish", contractorName: "", trade: "", low: 5000, high: 10000, notes: "", status: "Not Selected" },
     ],
   },
 ];
@@ -595,7 +592,12 @@ function SelectionsTab({ projects }) {
 // FIXTURES TAB
 // ═══════════════════════════════════════════════════════════════════════════════
 function FixturesTab() {
-  const [fixtures, setFixtures] = useState(seedFixtures);
+  const [fixtures, setFixtures] = useState(() => {
+    try { const s = localStorage.getItem('aki_fixtures'); return s ? JSON.parse(s) : seedFixtures(); } catch(e) { return seedFixtures(); }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('aki_fixtures', JSON.stringify(fixtures)); } catch(e) {}
+  }, [fixtures]);
   const [showAdd, setShowAdd] = useState(false);
   const [nf, setNf] = useState({ room: "", name: "", qty: 1, budgetLow: "", budgetHigh: "", notes: "" });
   const [confirmDel, setConfirmDel] = useState(null);
@@ -743,8 +745,18 @@ const seedPayments = () => [
 
 function CalendarTab() {
   const today = new Date();
-  const [events, setEvents] = useState(seedEvents);
-  const [payments, setPayments] = useState(seedPayments);
+  const [events, setEvents] = useState(() => {
+    try { const s = localStorage.getItem('aki_events'); return s ? JSON.parse(s) : seedEvents(); } catch(e) { return seedEvents(); }
+  });
+  const [payments, setPayments] = useState(() => {
+    try { const s = localStorage.getItem('aki_payments'); return s ? JSON.parse(s) : seedPayments(); } catch(e) { return seedPayments(); }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('aki_events', JSON.stringify(events)); } catch(e) {}
+  }, [events]);
+  useEffect(() => {
+    try { localStorage.setItem('aki_payments', JSON.stringify(payments)); } catch(e) {}
+  }, [payments]);
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [panel, setPanel]         = useState("calendar");
@@ -967,7 +979,13 @@ const TABS = [
 function App() {
   const [tab, setTab]           = useState("budget");
   const [priceMode, setPriceMode] = useState("high");
-  const [projects, setProjects]   = useState(seedProjects);
+  const [projects, setProjects]   = useState(() => {
+    try { const s = localStorage.getItem('aki_projects'); return s ? JSON.parse(s) : seedProjects(); } catch(e) { return seedProjects(); }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('aki_projects', JSON.stringify(projects)); } catch(e) {}
+  }, [projects]);
 
   return (
     <div style={{ fontFamily: "'Cormorant Garamond', Georgia, 'Times New Roman', serif", minHeight: "100vh", background: B.cream, color: B.dark }}>
